@@ -1,0 +1,61 @@
+#!/bin/sh
+
+# Prints all batteries, their percentage remaining, and a Nerd Font icon for charge status.
+
+case $BLOCK_BUTTON in
+3) notify-send " Battery module" " : full charge
+ : 75-99%
+ : 31-74%
+ : 11-30%
+ : 1-10% (low)
+ : charging
+󰂃 : not charging
+󰁻 : discharging
+ : battery very low!
+- Scroll to adjust brightness." ;;
+4) xbacklight -inc 10 ;;
+5) xbacklight -dec 10 ;;
+6) "$TERMINAL" -e "$EDITOR" "$0" ;;
+esac
+
+# Check if plugged in
+if [ -f /sys/class/power_supply/AC/online ]; then
+  AC_STATUS=$(cat /sys/class/power_supply/AC/online)
+else
+  AC_STATUS=0 # Default to unplugged if AC status isn't found
+fi
+
+# Loop through all attached batteries and format the info
+for battery in /sys/class/power_supply/BAT?*; do
+  # If non-first battery, print a space separator.
+  [ -n "${capacity+x}" ] && printf " "
+
+  # Get battery status and charge level
+  bat_status="$(cat "$battery/status" 2>&1)"
+  capacity="$(cat "$battery/capacity" 2>&1)"
+
+  # Choose icon based on battery percentage
+  if [ "$capacity" -ge 100 ]; then
+    icon=" " # 100% full
+  elif [ "$capacity" -ge 75 ]; then
+    icon=" " # 75-99%
+  elif [ "$capacity" -ge 50 ]; then
+    icon=" " # 50-74%
+  elif [ "$capacity" -ge 25 ]; then
+    icon=" " # 25-49%
+  else
+    icon=" " # 1-24% (low battery)
+  fi
+
+  # If charging, override with charging icon
+  if [ "$bat_status" = "Charging" ] || [ "$AC_STATUS" -eq 1 ]; then
+    icon=" "
+  fi
+
+  # Warn if battery is very low
+  [ "$capacity" -le 25 ] && warn=" "
+
+  # Print the battery status with the correct icon
+  printf "%s%s%d%%" "$icon" "$warn" "$capacity"
+  unset warn
+done && printf "\\n"
